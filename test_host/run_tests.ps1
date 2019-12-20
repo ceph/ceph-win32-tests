@@ -5,7 +5,8 @@ Param(
     [string]$resultDir,
     [Parameter(Mandatory=$true)]
     [string]$cephConfig,
-    [int]$testSuiteTimeout=300
+    [int]$testSuiteTimeout=300,
+    [int]$workerCount=8
 )
 
 $ErrorActionPreference = "Stop"
@@ -61,10 +62,14 @@ function run_gtests_from_dir($testdir, $resultDir, $pattern,
                              $isolatedTestsMapping,
                              $runIsolatedTests,
                              $testType,
-                             $subunitOutFile) {
+                             $subunitOutFile,
+                             $workerCount=8) {
     $testList = ls -Recurse $testdir | `
                 ? { $_.Name -match $pattern }
 
+    $rsp = [RunspaceFactory]::CreateRunspacePool($workerCount, $workerCount)
+    $rsp.Open()
+    $jobs = @()
     foreach($testBinary in $testList) {
         $testName = $testBinary.Name
         $testPath = $testBinary.FullName
@@ -79,27 +84,74 @@ function run_gtests_from_dir($testdir, $resultDir, $pattern,
             $testFilter = "-$testFilter"
         }
 
-        try {
-            notify_starting_test $testName $testType
-            run_gtest_subunit `
-                $testPath $resultDir $testSuiteTimeout $testFilter `
-                $subunitOutFile
-            notify_successful_test $testName $testType
+        notify_starting_test $testName $testType
+        $job = [Powershell]::Create().AddScript({
+            Param(
+                [Parameter(Mandatory=$true)]
+                [string]$utilsModuleLocation,
+                [Parameter(Mandatory=$true)]
+                [string]$testPath,
+                [Parameter(Mandatory=$true)]
+                [string]$resultDir,
+                [Parameter(Mandatory=$true)]
+                [int]$testSuiteTimeout,
+                [Parameter(Mandatory=$true)]
+                [string]$subunitOutFile,
+                [string]$testFilter
+            )
+            import-module $utilsModuleLocation
+            try {
+                run_gtest_subunit `
+                    $testPath $resultDir $testSuiteTimeout $testFilter `
+                    $subunitOutFile
+                return @{success=$true}
+            }
+            catch {
+                $errMsg = $_.Exception.Message
+                return @{success=$false; errMsg=$errMsg}
+                
+            }
+        }).AddParameters(@{
+            utilsModuleLocation="$scriptLocation\..\utils\windows\all.psm1";
+            testPath=$testPath;
+            resultDir=$resultDir;
+            testSuiteTimeout=$testSuiteTimeout;
+            testFilter=$testFilter;
+            subunitOutFile=$subunitOutFile
+        })
+        $job.RunspacePool = $rsp
+        $jobs += @{
+            Job=$job;
+            Result=$job.BeginInvoke();
+            TestName=$testName;
+            TestType=$testType
         }
-        catch {
-            $errMsg = $_.Exception.Message
-            notify_failed_test $testName $testType $errMsg
+    }
+
+    do {
+        Start-Sleep -seconds 10
+        $finishedCount = ($jobs | ? {$_.Result.IsCompleted -eq $true}).Count
+        $totalCount = ($jobs).Count
+        log_message "Finished $finishedCount out of $totalCount jobs."
+    } while ($finishedCount -lt $totalCount)
+
+    foreach($r in $jobs) {
+        $result = $r.Job.EndInvoke($r.Result)
+        if($result.success) {
+            notify_successful_test $r.TestName $r.TestType
+        }
+        else {
+            notify_failed_test $r.TestName $r.TestType $result.errMsg
         }
     }
 }
 
 function run_unit_tests() {
     $subunitFile = "$resultDir\subunit.out"
+    $testPattern="unittest.*.exe|ceph_test.*.exe"
 
     log_message "Running unit tests."
     log_message "Using subunit file: $subunitFile"
-
-    $testPattern="unittests.*.exe|ceph_test.*.exe"
 
     run_gtests_from_dir -testdir $testDir `
                         -resultDir $resultDir `
@@ -107,7 +159,8 @@ function run_unit_tests() {
                         -isolatedTestsMapping $isolatedUnitTests `
                         -runIsolatedTests $false `
                         -testType "unittests" `
-                        -subunitOutFile $subunitFile
+                        -subunitOutFile $subunitFile `
+                        -workerCount $workerCount
 
     # Various tests that are known to crash or hang.
     log_message "Running isolated unit tests."
@@ -117,7 +170,8 @@ function run_unit_tests() {
                         -isolatedTestsMapping $isolatedUnitTests `
                         -runIsolatedTests $true `
                         -testType "unittests_isolated" `
-                        -subunitOutFile $subunitFile
+                        -subunitOutFile $subunitFile `
+                        -workerCount $workerCount
 
     generate_subunit_report $subunitFile $resultDir `
                             "unittest_results"
