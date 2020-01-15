@@ -58,12 +58,22 @@ function get_isolated_tests($testFileName, $isolatedTestsMapping) {
     $isolatedTests
 }
 
-function run_gtests_from_dir($testdir, $resultDir, $pattern,
-                             $isolatedTestsMapping,
-                             $runIsolatedTests,
-                             $testType,
-                             $subunitOutFile,
-                             $workerCount=8) {
+function get_matching_pattern($str, $patternList) {
+    foreach ($pattern in $patternList) {
+        if ($str -match $pattern) {
+            return $pattern
+        }
+    }
+}
+
+function run_tests_from_dir(
+        $testdir, $resultDir, $pattern,
+        $isolatedTestsMapping,
+        $testType,
+        $runIsolatedTests,
+        $subunitOutFile,
+        $nonGTestList,
+        $workerCount=8) {
     $testList = ls -Recurse $testdir | `
                 ? { $_.Name -match $pattern }
 
@@ -76,6 +86,18 @@ function run_gtests_from_dir($testdir, $resultDir, $pattern,
 
         $isolatedTests = get_isolated_tests $testName $isolatedTestsMapping
         $testFilter = $isolatedTests -join ":"
+
+        $nonGTestPattern = get_matching_pattern $testName $nonGTestList.Keys
+        if ($nonGTestPattern) {
+            $isGtest = $false
+            $testArgs = $nonGTestList[$nonGTestPattern]
+            $tags = "$testType-standalone"
+        }
+        else {
+            $isGtest = $true
+            $testArgs = ""
+            $tags = "$testType-googletest"
+        }
 
         if ((! $runIsolatedTests) -and $testFilter -eq "*") {
             # This whole test suite is skipped. We won't pass this filter to
@@ -90,7 +112,7 @@ function run_gtests_from_dir($testdir, $resultDir, $pattern,
             $testFilter = "-$testFilter"
         }
 
-        notify_starting_test $testName $testType
+        notify_starting_test $testName $tags
         $job = [Powershell]::Create().AddScript({
             Param(
                 [Parameter(Mandatory=$true)]
@@ -103,19 +125,27 @@ function run_gtests_from_dir($testdir, $resultDir, $pattern,
                 [int]$testSuiteTimeout,
                 [Parameter(Mandatory=$true)]
                 [string]$subunitOutFile,
-                [string]$testFilter
+                [string]$testFilter,
+                [bool]$isGtest
             )
             import-module $utilsModuleLocation
             try {
-                run_gtest_subunit `
-                    $testPath $resultDir $testSuiteTimeout $testFilter `
-                    $subunitOutFile
+                if ($isGtest) {
+                    run_gtest_subunit `
+                        $testPath $resultDir $testSuiteTimeout $testFilter `
+                        $subunitOutFile
+                }
+                else {
+                    run_test_subunit `
+                        $testPath $resultDir $subunitOutFile `
+                        $testSuiteTimeout $testArgs
+                }
+                
                 return @{success=$true}
             }
             catch {
                 $errMsg = $_.Exception.Message
                 return @{success=$false; errMsg=$errMsg}
-                
             }
         }).AddParameters(@{
             utilsModuleLocation="$scriptLocation\..\utils\windows\all.psm1";
@@ -123,14 +153,15 @@ function run_gtests_from_dir($testdir, $resultDir, $pattern,
             resultDir=$resultDir;
             testSuiteTimeout=$testSuiteTimeout;
             testFilter=$testFilter;
-            subunitOutFile=$subunitOutFile
+            subunitOutFile=$subunitOutFile;
+            isGtest=$isGtest
         })
         $job.RunspacePool = $rsp
         $jobs += @{
             Job=$job;
             Result=$job.BeginInvoke();
             TestName=$testName;
-            TestType=$testType
+            TestType=$tags
         }
     }
 
@@ -156,28 +187,46 @@ function run_unit_tests() {
     $subunitFile = "$resultDir\subunit.out"
     $testPattern="unittest.*.exe|ceph_test.*.exe"
     # Tests that aren't using the google test framework or require specific
-    # arguments and will have to begin run differently.
+    # arguments and will have to begin run differently. The following mapping
+    # provides the arguments needed by each test.
     $nonGTestList=@{
-        "ceph_test_admin_socket_output.exe"="*";
+        "ceph_test_timers.exe"="";
+        "ceph_test_rados_delete_pools_parallel.exe"="";
+        "ceph_test_rados_list_parallel.exe"="";
+        "ceph_test_rados_open_pools_parallel.exe"="";
+        "ceph_test_rados_watch_notify.exe"="";
+    }
+    # Tests that aren't supposed to be run automatically.
+    $manualTests=@{
         "ceph_test_mutate.exe"="*";
         "ceph_test_rewrite_latency.exe"="*";
+    }
+    $excludedTests=@{
+        # This test passes, but it leaks a "sleep" subprocess which
+        # hang powershell's job mechanism.
+        "unittest_subprocess.exe"="SubProcessTimed.SubshellTimedout";
         "ceph_test_signal_handlers.exe"="*";
+        # WIP
+        "ceph_test_admin_socket_output.exe"="*";
     }
     $slowTestList=@{
         "ceph_test_rados_api_tier_pp.exe"="*";
     }
 
+    $excludedTests += $manualTests
+
     log_message "Running unit tests."
     log_message "Using subunit file: $subunitFile"
 
-    run_gtests_from_dir -testdir $testDir `
-                        -resultDir $resultDir `
-                        -pattern $testPattern `
-                        -isolatedTestsMapping $slowTestList + $nonGTestList `
-                        -runIsolatedTests $false `
-                        -testType "unittests" `
-                        -subunitOutFile $subunitFile `
-                        -workerCount $workerCount
+    run_tests_from_dir -testdir $testDir `
+                       -resultDir $resultDir `
+                       -pattern $testPattern `
+                       -isolatedTestsMapping $excludedTests `
+                       -runIsolatedTests $false `
+                       -testType "unittests" `
+                       -subunitOutFile $subunitFile `
+                       -workerCount $workerCount `
+                       -nonGTestList $nonGTestList
 
     # Various tests that are known to crash or hang.
     # log_message "Running isolated unit tests."

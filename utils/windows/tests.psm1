@@ -65,6 +65,49 @@ function run_gtest($binPath, $resultDir, $timeout=-1, $testFilter) {
     iex_with_timeout $cmd $timeout
 }
 
+function run_test($binPath, $resultDir, $timeout=-1, $args) {
+    $binName = (split-path -leaf $binPath) -replace ".exe$",""
+    $consoleOutputPath = join-path $resultDir ($binName + "_results.log")
+
+    $cmd = ("cmd /c '$binPath $args " +
+            "> $consoleOutputPath 2>&1'")
+    iex_with_timeout $cmd $timeout
+}
+
+function run_test_subunit($binPath, $resultDir,
+                          $subunitOutputPath, $timeout=-1, $args) {
+    $binName = (split-path -leaf $binPath) -replace ".exe$",""
+    $consoleOutputPath = join-path $resultDir ($binName + "_results.log")
+
+    $startTime = get_unix_time
+    try {
+        run_gtest $binPath $resultDir $timeout $args
+    }
+    catch {
+        $errMsg = $_.Exception.Message
+        $failed = $true
+        throw
+    }
+    finally {
+        $stopTime = get_unix_time
+
+        if ($failed) {
+            if (! $errMsg ) {
+                $errMsg = "Test failed: $binName."
+            }
+            add_subunit_failure $subunitOutputPath $binName `
+                                $startTime $stopTime `
+                                $errMsg $consoleOutputPath
+        }
+        else {
+            $testDetails = "Test passed: $binName"
+            add_subunit_success $subunitOutputPath $binName `
+                                $startTime $stopTime `
+                                $testDetails $consoleOutputPath
+        }
+    }
+}
+
 function get_gtest_list($binPath) {
     safe_exec ("$binPath --gtest_list_tests | " +
                "python `"$scriptLocation\..\common\parse_gtest_list.py`"")
