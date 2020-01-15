@@ -76,6 +76,12 @@ function run_gtests_from_dir($testdir, $resultDir, $pattern,
 
         $isolatedTests = get_isolated_tests $testName $isolatedTestsMapping
         $testFilter = $isolatedTests -join ":"
+
+        if ((! $runIsolatedTests) -and $testFilter -eq "*") {
+            # This whole test suite is skipped. We won't pass this filter to
+            # the binary as it may not use the GTest framework.
+            continue
+        }
         if ($runIsolatedTests -and (! $testFilter)) {
             # No isolated tests for this suite.
             continue
@@ -149,6 +155,17 @@ function run_gtests_from_dir($testdir, $resultDir, $pattern,
 function run_unit_tests() {
     $subunitFile = "$resultDir\subunit.out"
     $testPattern="unittest.*.exe|ceph_test.*.exe"
+    # Tests that aren't using the google test framework or require specific
+    # arguments and will have to begin run differently.
+    $nonGTestList=@{
+        "ceph_test_admin_socket_output.exe"="*";
+        "ceph_test_mutate.exe"="*";
+        "ceph_test_rewrite_latency.exe"="*";
+        "ceph_test_signal_handlers.exe"="*";
+    }
+    $slowTestList=@{
+        "ceph_test_rados_api_tier_pp.exe"="*";
+    }
 
     log_message "Running unit tests."
     log_message "Using subunit file: $subunitFile"
@@ -156,22 +173,22 @@ function run_unit_tests() {
     run_gtests_from_dir -testdir $testDir `
                         -resultDir $resultDir `
                         -pattern $testPattern `
-                        -isolatedTestsMapping $isolatedUnitTests `
+                        -isolatedTestsMapping $slowTestList + $nonGTestList `
                         -runIsolatedTests $false `
                         -testType "unittests" `
                         -subunitOutFile $subunitFile `
                         -workerCount $workerCount
 
     # Various tests that are known to crash or hang.
-    log_message "Running isolated unit tests."
-    run_gtests_from_dir -testdir $testDir `
-                        -resultDir $resultDir `
-                        -pattern $testPattern `
-                        -isolatedTestsMapping $isolatedUnitTests `
-                        -runIsolatedTests $true `
-                        -testType "unittests_isolated" `
-                        -subunitOutFile $subunitFile `
-                        -workerCount $workerCount
+    # log_message "Running isolated unit tests."
+    # run_gtests_from_dir -testdir $testDir `
+    #                     -resultDir $resultDir `
+    #                     -pattern $testPattern `
+    #                     -isolatedTestsMapping $isolatedUnitTests `
+    #                     -runIsolatedTests $true `
+    #                     -testType "unittests_isolated" `
+    #                     -subunitOutFile $subunitFile `
+    #                     -workerCount $workerCount
 
     generate_subunit_report $subunitFile $resultDir `
                             "unittest_results"
