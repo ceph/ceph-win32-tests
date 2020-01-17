@@ -6,7 +6,8 @@ Param(
     [Parameter(Mandatory=$true)]
     [string]$cephConfig,
     [int]$testSuiteTimeout=300,
-    [int]$workerCount=8
+    [int]$workerCount=8,
+    [bool]$skipSlowTests=$false
 )
 
 $ErrorActionPreference = "Stop"
@@ -33,11 +34,11 @@ function validate_test_run() {
 }
 
 function notify_starting_test($testDescription, $testType) {
-    log_message "Running test: ($testType) $testDescription."
+    log_message "Running test: $testType $testDescription."
 }
 
 function notify_successful_test($testDescription, $testType) {
-    log_message "($testType) $testDescription passed."
+    log_message "$testType $testDescription passed."
 }
 
 function notify_failed_test($testDescription, $testType, $errMsg) {
@@ -45,7 +46,7 @@ function notify_failed_test($testDescription, $testType, $errMsg) {
     # throwing an error at the end of the run.
     $env:TEST_FAILED = "1"
 
-    log_message "($testType) $testDescription failed. Error: $errMsg"
+    log_message "$testType $testDescription failed. Error: $errMsg"
 }
 
 function get_isolated_tests($testFileName, $isolatedTestsMapping) {
@@ -91,12 +92,12 @@ function run_tests_from_dir(
         if ($nonGTestPattern) {
             $isGtest = $false
             $testArgs = $nonGTestList[$nonGTestPattern]
-            $tags = "$testType-standalone"
+            $tags = "$testType[standalone]"
         }
         else {
             $isGtest = $true
             $testArgs = ""
-            $tags = "$testType-googletest"
+            $tags = "$testType[googletest]"
         }
 
         if ((! $runIsolatedTests) -and $testFilter -eq "*") {
@@ -223,8 +224,8 @@ function run_tests() {
         "unittest_throttle.exe"="*";
         # The Mingw C runtime seems to have some issues. Among others,
         # the "%z" flag isn't handled properly by strftime.
-        "unittest_time.exe"=@(
-            "TimePoints.stringify",
+        "unittest_time.exe"="TimePoints.stringify"
+        "unittest_utime.exe"=@(
             "utime_t.localtime",
             "utime_t.parse_date");
         # The following tests are affected by errno conversions
@@ -242,15 +243,29 @@ function run_tests() {
         "ceph_test_rados_api_aio_pp.exe"="LibRadosAio.OmapPP";
         # TODO: some watch timeout is not honored. Watch3 seems to be broken.
         "ceph_test_rados_api_watch_notify.exe"="LibRadosWatchNotify.Watch3Timeout";
-        "ceph_test_rados_api_watch_notify_pp.exe"="LibRadosWatchNotifyPP.WatchNotify3";
+        "ceph_test_rados_api_watch_notify_pp.exe"="*WatchNotify3*";
         # TODO
-        "ceph_test_lazy_omap_stats.exe"="*"
+        "ceph_test_lazy_omap_stats.exe"="*";
+        # seems broken. When shutting down timers, it asserts that a lock is
+        # set but nobody's locking it. It passes if CEPH_DEBUG_MUTEX is
+        # disabled, in which case such checks always return 1.
+        "ceph_test_timers.exe"="*";
+        # For some reason, the following tests gets WSAECONNREFUSED errors but
+        # only when running under a powershell job, passing otherwise.
+        "unittest_perf_counters.exe"="*";
     }
     $slowTestList=@{
+        # Takes about 20 minutes, all the rest finish in about 5 minutes.
         "ceph_test_rados_api_tier_pp.exe"="*";
     }
+    # The following tests have to be run separately.
+    $isolatedTests=@{
+    }
 
-    $excludedTests += $manualTests
+    $excludedTests += $manualTests + $isolatedTests
+    if ($skipSlowTests) {
+        $excludedTests += $slowTestList
+    }
 
     log_message "Running unit tests."
     log_message "Using subunit file: $subunitFile"
@@ -265,16 +280,17 @@ function run_tests() {
                        -workerCount $workerCount `
                        -nonGTestList $nonGTestList
 
-    # Various tests that are known to crash or hang.
-    # log_message "Running isolated unit tests."
-    # run_gtests_from_dir -testdir $testDir `
-    #                     -resultDir $resultDir `
-    #                     -pattern $testPattern `
-    #                     -isolatedTestsMapping $isolatedUnitTests `
-    #                     -runIsolatedTests $true `
-    #                     -testType "unittests_isolated" `
-    #                     -subunitOutFile $subunitFile `
-    #                     -workerCount $workerCount
+    # Various tests that are known to crash, hang or cannot be run in parallel.
+    log_message "Running isolated unit tests."
+    run_tests_from_dir -testdir $testDir `
+                       -resultDir $resultDir `
+                       -pattern $testPattern `
+                       -isolatedTestsMapping $isolatedTests `
+                       -runIsolatedTests $true `
+                       -testType "[isolated]" `
+                       -subunitOutFile $subunitFile `
+                       -workerCount 1 `
+                       -nonGTestList $nonGTestList
 
     generate_subunit_report $subunitFile $resultDir `
                             "test_results"
