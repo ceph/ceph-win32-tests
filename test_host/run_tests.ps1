@@ -185,7 +185,7 @@ function run_tests_from_dir(
 
 function run_tests() {
     $subunitFile = "$resultDir\subunit.out"
-    $testPattern="unittest.*.exe|ceph_test.*.exe"
+    $testPattern="^unittest.*.exe$|^ceph_test.*.exe$"
     # Tests that aren't using the google test framework or require specific
     # arguments and will have to begin run differently. The following mapping
     # provides the arguments needed by each test.
