@@ -168,10 +168,9 @@ function run_tests_from_dir(
 
     do {
         Start-Sleep -seconds 10
-        $finishedCount = ($jobs | ? {$_.Result.IsCompleted -eq $true}).Count
-        $totalCount = ($jobs).Count
-        log_message "Finished $finishedCount out of $totalCount jobs."
-    } while ($finishedCount -lt $totalCount)
+        [System.Object[]]$finished = $jobs | ? {$_.Result.IsCompleted -eq $true}
+        log_message "Finished $($finished.Count) out of $($jobs.Count) jobs."
+    } while ($finished.Count -lt $jobs.Count)
 
     foreach($r in $jobs) {
         $result = $r.Job.EndInvoke($r.Result)
