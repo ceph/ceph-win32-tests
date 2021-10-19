@@ -298,8 +298,10 @@ function run_tests() {
                        -workerCount 1 `
                        -nonGTestList $nonGTestList
 
-    generate_subunit_report $subunitFile $resultDir `
-                            "test_results"
+    # TODO: Sometimes this fails with 'subunit.v2.ParseError: Bad checksum - calculated'.
+    #       This needs to be investigated.
+    # generate_subunit_report $subunitFile $resultDir `
+    #                         "test_results"
 }
 
 ensure_dir_exists $resultDir
