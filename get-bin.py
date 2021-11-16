@@ -5,21 +5,22 @@ import sys
 import urllib.parse
 from string import Template
 
-SHAMAN_SEARCH = 'https://shaman.ceph.com/api/search/?distros=$distro/$distrover&sha1=$sha1'  # noqa
-CHACRA_BIN = 'https://$chacra_host/binaries/ceph/$ref/$sha1/$distro/$distrover/x86_64/flavors/default/$filename/'  # noqa
+SHAMAN_SEARCH = 'https://shaman.ceph.com/api/search/?distros=$distro/$distrover&ref=$branchname&sha1=$sha1'  # noqa
+CHACRA_BIN = 'https://$chacra_host/binaries/ceph/$ref/$sha1/$distro/$distrover/x86_64/flavors/default/$filename'  # noqa
 
-SHA1 = 'latest'
 DISTRO = 'windows'
 DISTROVER = '1809'
+BRANCHNAME = 'master'
+SHA1 = 'latest'
 FILENAME = 'ceph.zip'
 
 
-def getbin(sha1, distro, distrover, filename):
+def getbin(distro, distrover, branchname, sha1, filename):
     resp = requests.get(Template(SHAMAN_SEARCH).substitute(
         distro=distro,
         distrover=distrover,
+        branchname=branchname,
         sha1=sha1,
-        filename=filename,
     ))
     resp.raise_for_status()
     resp_json = resp.json()
@@ -48,13 +49,18 @@ def getbin(sha1, distro, distrover, filename):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--sha1', '-s', default=SHA1)
     parser.add_argument('--distro', '-D', default=DISTRO)
     parser.add_argument('--distrover', '-V', default=DISTROVER)
+    parser.add_argument('--branchname', '-b', default=BRANCHNAME)
+    parser.add_argument('--sha1', '-s', default=SHA1)
     parser.add_argument('--filename', '-f', default=FILENAME)
     args = parser.parse_args()
 
-    getbin(args.sha1, args.distro, args.distrover, args.filename)
+    getbin(args.distro,
+           args.distrover,
+           args.branchname,
+           args.sha1,
+           args.filename)
     return 0
 
 
