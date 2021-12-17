@@ -5,9 +5,10 @@ import sys
 import urllib.parse
 from string import Template
 
-SHAMAN_SEARCH = 'https://shaman.ceph.com/api/search/?distros=$distro/$distrover&ref=$branchname&sha1=$sha1'  # noqa
-CHACRA_BIN = 'https://$chacra_host/binaries/ceph/$ref/$sha1/$distro/$distrover/x86_64/flavors/default/$filename'  # noqa
+SHAMAN_SEARCH = 'https://shaman.ceph.com/api/search/?project=$project&distros=$distro/$distrover&ref=$branchname&sha1=$sha1'  # noqa
+CHACRA_BIN = 'https://$chacra_host/binaries/$project/$ref/$sha1/$distro/$distrover/x86_64/flavors/default/$filename'  # noqa
 
+PROJECT = 'ceph'
 DISTRO = 'windows'
 DISTROVER = '1809'
 BRANCHNAME = 'master'
@@ -15,8 +16,9 @@ SHA1 = 'latest'
 FILENAME = 'ceph.zip'
 
 
-def getbin(distro, distrover, branchname, sha1, filename):
+def getbin(project, distro, distrover, branchname, sha1, filename):
     resp = requests.get(Template(SHAMAN_SEARCH).substitute(
+        project=project,
         distro=distro,
         distrover=distrover,
         branchname=branchname,
@@ -33,6 +35,7 @@ def getbin(distro, distrover, branchname, sha1, filename):
         chacra_host, chacra_ref, chacra_sha1, resp.url))
     resp = requests.get(Template(CHACRA_BIN).substitute(
         chacra_host=chacra_host,
+        project=project,
         ref=chacra_ref,
         sha1=chacra_sha1,
         distro=distro,
@@ -49,6 +52,7 @@ def getbin(distro, distrover, branchname, sha1, filename):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--project', default=PROJECT)
     parser.add_argument('--distro', '-D', default=DISTRO)
     parser.add_argument('--distrover', '-V', default=DISTROVER)
     parser.add_argument('--branchname', '-b', default=BRANCHNAME)
@@ -56,7 +60,8 @@ def main():
     parser.add_argument('--filename', '-f', default=FILENAME)
     args = parser.parse_args()
 
-    getbin(args.distro,
+    getbin(args.project,
+           args.distro,
            args.distrover,
            args.branchname,
            args.sha1,
