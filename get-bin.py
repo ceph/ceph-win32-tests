@@ -11,7 +11,7 @@ CHACRA_BIN = 'https://$chacra_host/binaries/$project/$ref/$sha1/$distro/$distrov
 PROJECT = 'ceph'
 DISTRO = 'windows'
 DISTROVER = '1809'
-BRANCHNAME = 'master'
+BRANCHNAME = 'main'
 SHA1 = 'latest'
 FILENAME = 'ceph.zip'
 
