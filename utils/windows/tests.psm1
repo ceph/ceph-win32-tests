@@ -46,8 +46,8 @@ function generate_subunit_report($subunitPath, $reportDir, $reportName) {
     $textResultFile = "$reportDir\$reportName.txt"
     $htmlResultFile = "$reportDir\$reportName.html"
 
-    cmd /c "type $subunitPath | subunit-trace > $textResultFile"
-    subunit2html $subunitPath $htmlResultFile
+    safe_exec "type $subunitPath | subunit-trace" | Out-File -Encoding ascii -FilePath $textResultFile
+    safe_exec "subunit2html $subunitPath $htmlResultFile"
 }
 
 function run_gtest($binPath, $resultDir, $timeout=-1, $testFilter) {

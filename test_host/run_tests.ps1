@@ -300,8 +300,11 @@ function run_tests() {
 
     # TODO: Sometimes this fails with 'subunit.v2.ParseError: Bad checksum - calculated'.
     #       This needs to be investigated.
-    # generate_subunit_report $subunitFile $resultDir `
-    #                         "test_results"
+    try {
+        generate_subunit_report $subunitFile $resultDir "test_results"
+    } catch {
+        log_message "failed to generate HTML subunit report. skipping"
+    }
 }
 
 ensure_dir_exists $resultDir
