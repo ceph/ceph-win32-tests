@@ -111,6 +111,13 @@ function run_tests_from_dir(
         }
 
         notify_starting_test $testName $tags
+
+
+        # We had issues with corrupted subunit files, so each job will
+        # stream to a separate file. We'll merge those files afterwards.
+        $uid = [guid]::NewGuid().ToString()
+        $subunitTempFile = $subunitOutFile + ".tmp." + $uid
+
         $job = [Powershell]::Create().AddScript({
             Param(
                 [Parameter(Mandatory=$true)]
@@ -151,7 +158,7 @@ function run_tests_from_dir(
             resultDir=$resultDir;
             testSuiteTimeout=$testSuiteTimeout;
             testFilter=$testFilter;
-            subunitOutFile=$subunitOutFile;
+            subunitOutFile=$subunitTempFile;
             isGtest=$isGtest
         })
         $job.RunspacePool = $rsp
@@ -177,6 +184,13 @@ function run_tests_from_dir(
         else {
             notify_failed_test $r.TestName $r.TestType $result.errMsg
         }
+    }
+
+    # Aggregate the results
+    ls ($subunitOutFile + ".tmp.*") | % {
+        $subunitTempFile = $_.FullName
+        gc -encoding byte $subunitTempFile -Read 512 | ac -encoding byte $subunitOutFile
+        rm $subunitTempFile
     }
 }
 
@@ -268,6 +282,8 @@ function run_tests() {
         "unittest_admin_socket.exe"="*";
     }
 
+    # TODO: fix merging hashtables, allow the same suite to have some excluded
+    # tests and some marked as slow tests.
     ($manualTests.Keys + $isolatedTests.Keys) | ForEach-Object { $excludedTests += @{$_="*"} }
     if ($skipSlowTests) {
         $slowTestList.Keys | ForEach-Object { $excludedTests += @{$_="*"} }
