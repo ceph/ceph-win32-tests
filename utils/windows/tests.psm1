@@ -81,7 +81,7 @@ function run_test_subunit($binPath, $resultDir,
 
     $startTime = get_unix_time
     try {
-        run_gtest $binPath $resultDir $timeout $args
+        run_test $binPath $resultDir $timeout $args
     }
     catch {
         $errMsg = $_.Exception.Message
