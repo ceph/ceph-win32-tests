@@ -216,6 +216,19 @@ function run_tests() {
         # This test passes but it leaks a "sleep" subprocess which
         # hangs powershell's job mechanism.
         "unittest_subprocess.exe"="SubProcessTimed.SubshellTimedout";
+        # TODO: the following tests seem to use the AioTestData semaphore incorrectly.
+        # The same AioTestData structure is reused for multiple async callbacks, which
+        # implies multiple completion notifications. However, the semaphore is initialized
+        # with 0, so "wait" will return before subsequent "notify" calls complete.
+        # For this reason, we can have situations in which "notify" callbacks occur after
+        # the test completes and the AioTestData structure and semaphore are cleaned up,
+        # which leads to a crash:
+        #   * https://pastebin.com/raw/gh7CytHA
+        #   * https://pastebin.com/raw/2Yu90uEG
+        "ceph_test_rados_striper_api_aio.exe"=@(
+            "*.Flush*",
+            "*.RoundTrip*",
+            "*.IsSafe*")
         "ceph_test_signal_handlers.exe"="*";
         # TODO - we may stick to the client tests, but this may also
         # involve RGW, which we haven't covered yet.
