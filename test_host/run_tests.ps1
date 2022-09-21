@@ -206,6 +206,7 @@ function run_tests() {
         "ceph_test_rados_list_parallel.exe"="";
         "ceph_test_rados_open_pools_parallel.exe"="";
         "ceph_test_rados_watch_notify.exe"="";
+        "ceph_test_rados_op_speed"="";
     }
     # Tests that aren't supposed to be run automatically.
     $manualTests=@{
