@@ -206,6 +206,7 @@ function run_tests() {
         "ceph_test_rados_list_parallel.exe"="";
         "ceph_test_rados_open_pools_parallel.exe"="";
         "ceph_test_rados_watch_notify.exe"="";
+        "ceph_test_rados_op_speed"="";
     }
     # Tests that aren't supposed to be run automatically.
     $manualTests=@{
@@ -216,6 +217,19 @@ function run_tests() {
         # This test passes but it leaks a "sleep" subprocess which
         # hangs powershell's job mechanism.
         "unittest_subprocess.exe"="SubProcessTimed.SubshellTimedout";
+        # TODO: the following tests seem to use the AioTestData semaphore incorrectly.
+        # The same AioTestData structure is reused for multiple async callbacks, which
+        # implies multiple completion notifications. However, the semaphore is initialized
+        # with 0, so "wait" will return before subsequent "notify" calls complete.
+        # For this reason, we can have situations in which "notify" callbacks occur after
+        # the test completes and the AioTestData structure and semaphore are cleaned up,
+        # which leads to a crash:
+        #   * https://pastebin.com/raw/gh7CytHA
+        #   * https://pastebin.com/raw/2Yu90uEG
+        "ceph_test_rados_striper_api_aio.exe"=@(
+            "*.Flush*",
+            "*.RoundTrip*",
+            "*.IsSafe*")
         "ceph_test_signal_handlers.exe"="*";
         # TODO - we may stick to the client tests, but this may also
         # involve RGW, which we haven't covered yet.
@@ -319,7 +333,14 @@ function run_tests() {
     try {
         generate_subunit_report $subunitFile $resultDir "test_results"
     } catch {
-        log_message "failed to generate HTML subunit report. skipping"
+        log_message "Failed to generate HTML subunit report: $_"
+        if (test-path $subunitFile) {
+            $subunitHash = (Get-FileHash $subunitFile -Algorithm SHA256).Hash
+            log_message "subunit file: $subunitFile"
+            log_message "subunit sha256 hash: $subunitHash"
+        } else {
+            log_message "missing subunit file: $subunitFile"
+        }
     }
 }
 
