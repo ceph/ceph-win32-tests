@@ -337,7 +337,7 @@ function run_tests() {
         if (test-path $subunitFile) {
             $subunitHash = (Get-FileHash $subunitFile -Algorithm SHA256).Hash
             log_message "subunit file: $subunitFile"
-            log_message "subunit sha256 hash: $subunitHash"
+            log_message "subunit sha256 checksum: $subunitHash"
         } else {
             log_message "missing subunit file: $subunitFile"
         }
