@@ -333,7 +333,14 @@ function run_tests() {
     try {
         generate_subunit_report $subunitFile $resultDir "test_results"
     } catch {
-        log_message "failed to generate HTML subunit report. skipping"
+        log_message "Failed to generate HTML subunit report: $_"
+        if (test-path $subunitFile) {
+            $subunitHash = (Get-FileHash $subunitFile -Algorithm SHA256).Hash
+            log_message "subunit file: $subunitFile"
+            log_message "subunit sha256 hash: $subunitHash"
+        } else {
+            log_message "missing subunit file: $subunitFile"
+        }
     }
 }
 
