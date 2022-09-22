@@ -26,6 +26,11 @@ if ($PSBoundParameters.ContainsKey('dumpDir')) {
     Set-ItemProperty `
         -Path $localDumpsRegPath -Name "DumpFolder" `
         -Value $dumpDir -Type ExpandString
+
+    if (!(Test-path $dumpDir)) {
+        log_message "creating folder $dumpDir"
+        mkdir $dumpDir
+    }
 }
 
 if ($PSBoundParameters.ContainsKey('dumpCount')) {
