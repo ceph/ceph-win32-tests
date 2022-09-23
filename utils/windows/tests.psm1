@@ -46,8 +46,18 @@ function generate_subunit_report($subunitPath, $reportDir, $reportName) {
     $textResultFile = "$reportDir\$reportName.txt"
     $htmlResultFile = "$reportDir\$reportName.html"
 
-    safe_exec "type $subunitPath | subunit-trace" | Out-File -Encoding ascii -FilePath $textResultFile
     safe_exec "subunit2html $subunitPath $htmlResultFile"
+
+    try {
+        safe_exec "type $subunitPath | subunit-trace" | `
+            Out-File -Encoding ascii -FilePath $textResultFile
+    } catch {
+        # subunit-trace returns a non-zero exit code when the subunit file is
+        # invalid OR when there are failed tests. This function is only
+        # concerned in generating the test report and shouldn't fail if there
+        # are test failures.
+        log_message "subunit-trace reports failures: $_"
+    }
 }
 
 function run_gtest($binPath, $resultDir, $timeout=-1, $testFilter) {
