@@ -328,12 +328,10 @@ function run_tests() {
                        -workerCount 1 `
                        -nonGTestList $nonGTestList
 
-    # TODO: Sometimes this fails with 'subunit.v2.ParseError: Bad checksum - calculated'.
-    #       This needs to be investigated.
     try {
         generate_subunit_report $subunitFile $resultDir "test_results"
     } catch {
-        log_message "Failed to generate HTML subunit report: $_"
+        log_message "subunit report failure: $_"
         if (test-path $subunitFile) {
             $subunitHash = (Get-FileHash $subunitFile -Algorithm SHA256).Hash
             log_message "subunit file: $subunitFile"
