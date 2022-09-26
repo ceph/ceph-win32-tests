@@ -2,7 +2,7 @@ Param(
     [string]$testDir="${env:SystemDrive}\ceph",
     [string]$resultDir="${env:SystemDrive}\workspace\test_results",
     [string]$cephConfig="$env:ProgramData\ceph\ceph.conf",
-    [int]$testSuiteTimeout=300,
+    [int]$testSuiteTimeout=1800,
     [int]$workerCount=8,
     [bool]$skipSlowTests=$false
 )
