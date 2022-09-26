@@ -2,7 +2,7 @@ Param(
     [string]$testDir="${env:SystemDrive}\ceph",
     [string]$resultDir="${env:SystemDrive}\workspace\test_results",
     [string]$cephConfig="$env:ProgramData\ceph\ceph.conf",
-    [int]$testSuiteTimeout=300,
+    [int]$testSuiteTimeout=1800,
     [int]$workerCount=8,
     [bool]$skipSlowTests=$false
 )
@@ -277,8 +277,14 @@ function run_tests() {
         # For some reason, the following tests gets WSAECONNREFUSED errors but
         # only when running under a powershell job, passing otherwise.
         "unittest_perf_counters.exe"="*";
+        # TODO: the SnaptrimStats test fails on Linux as well, it most probably
+        # requires some specific configuration.
+        "ceph_test_rados_api_snapshots_stats.exe"="*SnaptrimStats*";
+        "ceph_test_rados_api_snapshots_stats_pp.exe"="*SnaptrimStats*";
         # TODO: Need debugging
         "unittest_compression.exe"="*";
+        # Fails on the CI env;
+        "ceph_test_rados_api_cls_remote_reads.exe"="*";
         "unittest_confutils.exe"=@(
             "ConfUtils.ParseFiles0");
         "unittest_fair_mutex.exe"=@(
