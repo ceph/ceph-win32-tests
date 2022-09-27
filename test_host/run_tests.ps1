@@ -300,6 +300,8 @@ function run_tests() {
     $isolatedTests=@{
         "unittest_bufferlist.exe"="*-BufferList.read_file";
         "unittest_admin_socket.exe"="*";
+        # Different tests try to access or remove the same paths
+        "ceph_test_libcephfs*"="*";
     }
 
     # TODO: fix merging hashtables, allow the same suite to have some excluded
