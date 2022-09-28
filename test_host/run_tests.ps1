@@ -81,6 +81,9 @@ function run_tests_from_dir(
     foreach($testBinary in $testList) {
         $testName = $testBinary.Name
         $testPath = $testBinary.FullName
+        $testBinName = (split-path -leaf $testPath) -replace ".exe$",""
+        $testResultDir = join-path $resultDir "out\${testBinName}"
+        ensure_dir_exists $testResultDir
 
         $isolatedTests = get_isolated_tests $testName $isolatedTestsMapping
         $testFilter = $isolatedTests -join ":"
@@ -155,7 +158,7 @@ function run_tests_from_dir(
         }).AddParameters(@{
             utilsModuleLocation="$scriptLocation\..\utils\windows\all.psm1";
             testPath=$testPath;
-            resultDir=$resultDir;
+            resultDir=$testResultDir;
             testSuiteTimeout=$testSuiteTimeout;
             testFilter=$testFilter;
             subunitOutFile=$subunitTempFile;

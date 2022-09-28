@@ -99,7 +99,7 @@ function ensure_binary_available($bin) {
 
 function ensure_dir_exists($path) {
     if (!(test-path $path)) {
-        mkdir $path | out-null
+        mkdir -force $path | out-null
     }
 }
 
