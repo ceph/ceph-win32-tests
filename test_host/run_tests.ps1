@@ -80,16 +80,15 @@ function run_tests_from_dir(
     $rsp.Open()
     $jobs = @()
     foreach($testBinary in $testList) {
-        $testName = $testBinary.Name
         $testPath = $testBinary.FullName
         $testBinName = (split-path -leaf $testPath) -replace ".exe$",""
         $testResultDir = join-path $resultDir "out\${testBinName}"
         ensure_dir_exists $testResultDir
 
-        $isolatedTests = get_isolated_tests $testName $isolatedTestsMapping
+        $isolatedTests = get_isolated_tests $testBinary.Name $isolatedTestsMapping
         $testFilter = $isolatedTests -join ":"
 
-        $nonGTestPattern = get_matching_pattern $testName $nonGTestList.Keys
+        $nonGTestPattern = get_matching_pattern $testBinary.Name $nonGTestList.Keys
         if ($nonGTestPattern) {
             $isGtest = $false
             $testArgs = $nonGTestList[$nonGTestPattern]
@@ -114,64 +113,86 @@ function run_tests_from_dir(
             $testFilter = "-$testFilter"
         }
 
-        notify_starting_test $testName $tags
-
         # We had issues with corrupted subunit files, so each job will
         # stream to a separate file. We'll merge those files afterwards.
         $uid = [guid]::NewGuid().ToString()
         $subunitTempFile = $subunitOutFile + ".tmp." + $uid
 
-        $job = [Powershell]::Create().AddScript({
-            Param(
-                [Parameter(Mandatory=$true)]
-                [string]$utilsModuleLocation,
-                [Parameter(Mandatory=$true)]
-                [string]$testPath,
-                [Parameter(Mandatory=$true)]
-                [string]$resultDir,
-                [Parameter(Mandatory=$true)]
-                [int]$testSuiteTimeout,
-                [Parameter(Mandatory=$true)]
-                [string]$subunitOutFile,
-                [string]$testFilter,
-                [bool]$isGtest,
-                [string]$testArgs
-            )
-            import-module $utilsModuleLocation
-            try {
-                if ($isGtest) {
-                    run_gtest_subunit `
-                        $testPath $resultDir $testSuiteTimeout $testFilter `
-                        $subunitOutFile
-                }
-                else {
-                    run_test_subunit `
-                        $testPath $resultDir $subunitOutFile `
-                        $testSuiteTimeout $testArgs
-                }
-                
-                return @{success=$true}
+        if ($testArgs -is [hashtable]) {
+            $testArgsMap = $testArgs
+        } else {
+            $testArgsMap = @{$testArgs=""}
+        }
+
+        $idx = 0
+        foreach($testArgs in $testArgsMap.Keys) {
+            $testSuffix = $testArgsMap[$testArgs]
+            if ($testSuffix) {
+                $testSuffix = "." + $testSuffix
+            } elseif ($testArgsMap.Keys.Length > 1) {
+                $testSuffix = "." + [string]$idx
             }
-            catch {
-                $errMsg = $_.Exception.Message
-                return @{success=$false; errMsg=$errMsg}
+
+            $testName = $testBinary.Name -replace ".exe$",""
+            $testName += $testSuffix
+
+            notify_starting_test $testName $tags
+
+            $job = [Powershell]::Create().AddScript({
+                Param(
+                    [Parameter(Mandatory=$true)]
+                    [string]$utilsModuleLocation,
+                    [Parameter(Mandatory=$true)]
+                    [string]$testPath,
+                    [Parameter(Mandatory=$true)]
+                    [string]$resultDir,
+                    [Parameter(Mandatory=$true)]
+                    [int]$testSuiteTimeout,
+                    [Parameter(Mandatory=$true)]
+                    [string]$subunitOutFile,
+                    [string]$testFilter,
+                    [bool]$isGtest,
+                    [string]$testArgs,
+                    [string]$testSuffix
+                )
+                import-module $utilsModuleLocation
+                try {
+                    if ($isGtest) {
+                        run_gtest_subunit `
+                            $testPath $resultDir $testSuiteTimeout `
+                            $testFilter $subunitOutFile $testSuffix
+                    }
+                    else {
+                        run_test_subunit `
+                            $testPath $resultDir $subunitOutFile `
+                            $testSuiteTimeout $testArgs $testSuffix
+                    }
+                    
+                    return @{success=$true}
+                }
+                catch {
+                    $errMsg = $_.Exception.Message
+                    return @{success=$false; errMsg=$errMsg}
+                }
+            }).AddParameters(@{
+                utilsModuleLocation="$scriptLocation\..\utils\windows\all.psm1";
+                testPath=$testPath;
+                resultDir=$testResultDir;
+                testSuiteTimeout=$testSuiteTimeout;
+                subunitOutFile=$subunitTempFile;
+                testFilter=$testFilter;
+                isGtest=$isGtest;
+                testArgs=$testArgs;
+                testSuffix=$testSuffix
+            })
+            $job.RunspacePool = $rsp
+            $jobs += @{
+                Job=$job;
+                Result=$job.BeginInvoke();
+                TestName=$testName;
+                TestType=$tags
             }
-        }).AddParameters(@{
-            utilsModuleLocation="$scriptLocation\..\utils\windows\all.psm1";
-            testPath=$testPath;
-            resultDir=$testResultDir;
-            testSuiteTimeout=$testSuiteTimeout;
-            subunitOutFile=$subunitTempFile;
-            testFilter=$testFilter;
-            isGtest=$isGtest;
-            testArgs=$testArgs;
-        })
-        $job.RunspacePool = $rsp
-        $jobs += @{
-            Job=$job;
-            Result=$job.BeginInvoke();
-            TestName=$testName;
-            TestType=$tags
+            $idx++;
         }
     }
 
@@ -212,7 +233,10 @@ function run_tests() {
         "ceph_test_rados_open_pools_parallel.exe"="";
         "ceph_test_rados_watch_notify.exe"="";
         "ceph_test_rados_op_speed"="";
-        "ceph_test_librbd_fsx.exe"="$rbdPoolName test_librbd_fsx -N 1000";
+        "ceph_test_librbd_fsx.exe"=@{
+            # TODO: add rbd-wnbd test, for now we're only running this test using
+            # librbd
+            "$rbdPoolName test_librbd_fsx0 -N 100"="librbd"};
     }
     # Tests that aren't supposed to be run automatically.
     $manualTests=@{
