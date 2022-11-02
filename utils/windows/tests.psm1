@@ -71,7 +71,9 @@ function run_gtest($binPath, $resultDir, $timeout=-1, $testFilter) {
     }
 
     $cmd = ("cmd /c '$binPath --gtest_output=xml:$xmlOutputPath $gtestFilterArg " +
-            "> $consoleOutputPath 2>&1'")
+            ">> $consoleOutputPath 2>&1'")
+
+    echo $cmd | Out-File -Encoding ascii -FilePath $consoleOutputPath
     iex_with_timeout $cmd $timeout
 }
 
@@ -80,7 +82,9 @@ function run_test($binPath, $resultDir, $timeout=-1, $testArgs) {
     $consoleOutputPath = join-path $resultDir ($binName + "_results.log")
 
     $cmd = ("cmd /c '$binPath $testArgs " +
-            "> $consoleOutputPath 2>&1'")
+            ">> $consoleOutputPath 2>&1'")
+
+    echo $cmd | Out-File -Encoding ascii -FilePath $consoleOutputPath
     iex_with_timeout $cmd $timeout
 }
 
