@@ -75,23 +75,23 @@ function run_gtest($binPath, $resultDir, $timeout=-1, $testFilter) {
     iex_with_timeout $cmd $timeout
 }
 
-function run_test($binPath, $resultDir, $timeout=-1, $args) {
+function run_test($binPath, $resultDir, $timeout=-1, $testArgs) {
     $binName = (split-path -leaf $binPath) -replace ".exe$",""
     $consoleOutputPath = join-path $resultDir ($binName + "_results.log")
 
-    $cmd = ("cmd /c '$binPath $args " +
+    $cmd = ("cmd /c '$binPath $testArgs " +
             "> $consoleOutputPath 2>&1'")
     iex_with_timeout $cmd $timeout
 }
 
 function run_test_subunit($binPath, $resultDir,
-                          $subunitOutputPath, $timeout=-1, $args) {
+                          $subunitOutputPath, $timeout=-1, $testArgs) {
     $binName = (split-path -leaf $binPath) -replace ".exe$",""
     $consoleOutputPath = join-path $resultDir ($binName + "_results.log")
 
     $startTime = get_unix_time
     try {
-        run_test $binPath $resultDir $timeout $args
+        run_test $binPath $resultDir $timeout $testArgs
     }
     catch {
         $errMsg = $_.Exception.Message

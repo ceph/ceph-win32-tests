@@ -4,7 +4,8 @@ Param(
     [string]$cephConfig="$env:ProgramData\ceph\ceph.conf",
     [int]$testSuiteTimeout=1800,
     [int]$workerCount=8,
-    [bool]$skipSlowTests=$false
+    [bool]$skipSlowTests=$false,
+    [string]$rbdPoolName="rbd"
 )
 
 $ErrorActionPreference = "Stop"
@@ -115,7 +116,6 @@ function run_tests_from_dir(
 
         notify_starting_test $testName $tags
 
-
         # We had issues with corrupted subunit files, so each job will
         # stream to a separate file. We'll merge those files afterwards.
         $uid = [guid]::NewGuid().ToString()
@@ -134,7 +134,8 @@ function run_tests_from_dir(
                 [Parameter(Mandatory=$true)]
                 [string]$subunitOutFile,
                 [string]$testFilter,
-                [bool]$isGtest
+                [bool]$isGtest,
+                [string]$testArgs
             )
             import-module $utilsModuleLocation
             try {
@@ -160,9 +161,10 @@ function run_tests_from_dir(
             testPath=$testPath;
             resultDir=$testResultDir;
             testSuiteTimeout=$testSuiteTimeout;
-            testFilter=$testFilter;
             subunitOutFile=$subunitTempFile;
-            isGtest=$isGtest
+            testFilter=$testFilter;
+            isGtest=$isGtest;
+            testArgs=$testArgs;
         })
         $job.RunspacePool = $rsp
         $jobs += @{
@@ -210,6 +212,7 @@ function run_tests() {
         "ceph_test_rados_open_pools_parallel.exe"="";
         "ceph_test_rados_watch_notify.exe"="";
         "ceph_test_rados_op_speed"="";
+        "ceph_test_librbd_fsx.exe"="$rbdPoolName test_librbd_fsx -N 1000";
     }
     # Tests that aren't supposed to be run automatically.
     $manualTests=@{
