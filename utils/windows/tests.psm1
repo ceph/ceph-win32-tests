@@ -60,10 +60,11 @@ function generate_subunit_report($subunitPath, $reportDir, $reportName) {
     }
 }
 
-function run_gtest($binPath, $resultDir, $timeout=-1, $testFilter) {
+function run_gtest($binPath, $resultDir, $timeout=-1, $testFilter, $testSuffix) {
     $binName = (split-path -leaf $binPath) -replace ".exe$",""
-    $xmlOutputPath = join-path $resultDir ($binName + "_results.xml")
-    $consoleOutputPath = join-path $resultDir ($binName + "_results.log")
+    $testName = $binName + $testSuffix
+    $xmlOutputPath = join-path $resultDir ($testName + "_results.xml")
+    $consoleOutputPath = join-path $resultDir ($testName + "_results.log")
     $gtestFilterArg = ""
 
     if ($testFilter) {
@@ -71,27 +72,34 @@ function run_gtest($binPath, $resultDir, $timeout=-1, $testFilter) {
     }
 
     $cmd = ("cmd /c '$binPath --gtest_output=xml:$xmlOutputPath $gtestFilterArg " +
-            "> $consoleOutputPath 2>&1'")
+            ">> $consoleOutputPath 2>&1'")
+
+    echo $cmd | Out-File -Encoding ascii -FilePath $consoleOutputPath
     iex_with_timeout $cmd $timeout
 }
 
-function run_test($binPath, $resultDir, $timeout=-1, $args) {
+function run_test($binPath, $resultDir, $timeout=-1, $testArgs, $testSuffix) {
     $binName = (split-path -leaf $binPath) -replace ".exe$",""
-    $consoleOutputPath = join-path $resultDir ($binName + "_results.log")
+    $testName = $binName + $testSuffix
+    $consoleOutputPath = join-path $resultDir ($testName + "_results.log")
 
-    $cmd = ("cmd /c '$binPath $args " +
-            "> $consoleOutputPath 2>&1'")
+    $cmd = ("cmd /c '$binPath $testArgs " +
+            ">> $consoleOutputPath 2>&1'")
+
+    echo $cmd | Out-File -Encoding ascii -FilePath $consoleOutputPath
     iex_with_timeout $cmd $timeout
 }
 
 function run_test_subunit($binPath, $resultDir,
-                          $subunitOutputPath, $timeout=-1, $args) {
+                          $subunitOutputPath, $timeout=-1,
+                          $testArgs, $testSuffix) {
     $binName = (split-path -leaf $binPath) -replace ".exe$",""
-    $consoleOutputPath = join-path $resultDir ($binName + "_results.log")
+    $testName = $binName + $testSuffix
+    $consoleOutputPath = join-path $resultDir ($testName + "_results.log")
 
     $startTime = get_unix_time
     try {
-        run_test $binPath $resultDir $timeout $args
+        run_test $binPath $resultDir $timeout $testArgs $testSuffix
     }
     catch {
         $errMsg = $_.Exception.Message
@@ -103,15 +111,15 @@ function run_test_subunit($binPath, $resultDir,
 
         if ($failed) {
             if (! $errMsg ) {
-                $errMsg = "Test failed: $binName."
+                $errMsg = "Test failed: $testName."
             }
-            add_subunit_failure $subunitOutputPath $binName `
+            add_subunit_failure $subunitOutputPath $testName `
                                 $startTime $stopTime `
                                 $errMsg $consoleOutputPath
         }
         else {
-            $testDetails = "Test passed: $binName"
-            add_subunit_success $subunitOutputPath $binName `
+            $testDetails = "Test passed: $testName"
+            add_subunit_success $subunitOutputPath $testName `
                                 $startTime $stopTime `
                                 $testDetails $consoleOutputPath
         }
@@ -124,14 +132,15 @@ function get_gtest_list($binPath) {
 }
 
 function run_gtest_subunit($binPath, $resultDir, $timeout=-1, $testFilter,
-                           $subunitOutputPath) {
+                           $subunitOutputPath, $testSuffix) {
     $binName = (split-path -leaf $binPath) -replace ".exe$",""
-    $xmlOutputPath = join-path $resultDir ($binName + "_results.xml")
-    $consoleOutputPath = join-path $resultDir ($binName + "_results.log")
+    $testName = $binName + $testSuffix
+    $xmlOutputPath = join-path $resultDir ($testName + "_results.xml")
+    $consoleOutputPath = join-path $resultDir ($testName + "_results.log")
 
     $startTime = get_unix_time
     try {
-        run_gtest $binPath $resultDir $timeout $testFilter
+        run_gtest $binPath $resultDir $timeout $testFilter $testSuffix
     }
     catch {
         $errMsg = $_.Exception.Message
@@ -140,13 +149,13 @@ function run_gtest_subunit($binPath, $resultDir, $timeout=-1, $testFilter,
     finally {
         $stopTime = get_unix_time
         if (test-path $xmlOutputPath) {
-            gtest2subunit $xmlOutputPath $subunitOutputPath $binName
+            gtest2subunit $xmlOutputPath $subunitOutputPath $testName
         }
         else {
             if (! $errMsg ) {
                 $errMsg = "Missing output xml."
             }
-            add_subunit_failure $subunitOutputPath $binName `
+            add_subunit_failure $subunitOutputPath $testName `
                                 $startTime $stopTime `
                                 $errMsg $consoleOutputPath
         }
