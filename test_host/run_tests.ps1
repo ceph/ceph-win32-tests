@@ -234,9 +234,9 @@ function run_tests() {
         "ceph_test_rados_watch_notify.exe"="";
         "ceph_test_rados_op_speed"="";
         "ceph_test_librbd_fsx.exe"=@{
-            # TODO: add rbd-wnbd test, for now we're only running this test using
-            # librbd
-            "$rbdPoolName test_librbd_fsx0 -N 100"="librbd"};
+            "$rbdPoolName test_librbd_fsx0 -N 500"="librbd";
+            "$rbdPoolName test_librbd_fsx1 -N 500 -M -L -r 4096 -w 4096 -O"="wnbd"
+        };
     }
     # Tests that aren't supposed to be run automatically.
     $manualTests=@{
