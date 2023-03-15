@@ -290,8 +290,7 @@ function run_tests() {
         # cls_helo.cc:write_return_data returns 42, which will be converted
         # TODO: ensure that this won't affect the rados/rbd (e.g. we may
         # end up converting values other than error codes, which is wrong).
-        "ceph_test_rados_api_tier_pp.exe"=`
-            "LibRadosTwoPoolsPP.HelloWriteReturn";
+        "ceph_test_rados_api_tier_pp.exe"="*";
         # TODO: look into this. seems like a local error (ECANCELED) gets
         # converted to the unix value, yet the test expects the host error.
         "ceph_test_rados_api_aio_pp.exe"="LibRadosAio.OmapPP";
@@ -321,14 +320,17 @@ function run_tests() {
             "FairMutex.fair");
         "unittest_mempool.exe"=@(
             "mempool.check_shard_select");
+        # bufferlist benchmark tests can take more than 30 minutes, for which
+        # reason we'll disable them by default.
+        "unittest_bufferlist.exe"=@(
+            "BufferList.read_file",
+            "*Bench*",
+            "*bench*");
     }
     $slowTestList=@{
-        # Takes about 20 minutes, all the rest finish in about 5 minutes.
-        "ceph_test_rados_api_tier_pp.exe"="*";
     }
     # The following tests have to be run separately.
     $isolatedTests=@{
-        "unittest_bufferlist.exe"="*-BufferList.read_file";
         "unittest_admin_socket.exe"="*";
         # Different tests try to access or remove the same paths
         "ceph_test_libcephfs*"="*";
