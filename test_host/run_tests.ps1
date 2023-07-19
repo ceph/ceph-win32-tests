@@ -332,8 +332,10 @@ function run_tests() {
     # The following tests have to be run separately.
     $isolatedTests=@{
         "unittest_admin_socket.exe"="*";
-        # Different tests try to access or remove the same paths
-        "ceph_test_libcephfs*"="*";
+        # Multiple libcephfs tests try to access or remove the same paths.
+        # Also, we're skipping flaky delegation tests:
+        # https://github.com/ceph/ceph/pull/52427#issuecomment-1640325664
+        "ceph_test_libcephfs*"="-LibCephFS.Deleg*";
     }
 
     # TODO: fix merging hashtables, allow the same suite to have some excluded
