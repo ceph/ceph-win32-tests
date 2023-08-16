@@ -234,8 +234,8 @@ function run_tests() {
         "ceph_test_rados_watch_notify.exe"="";
         "ceph_test_rados_op_speed"="";
         "ceph_test_librbd_fsx.exe"=@{
-            "$rbdPoolName test_librbd_fsx0 -N 500"="librbd";
-            "$rbdPoolName test_librbd_fsx1 -N 500 -M -L -r 4096 -w 4096 -O"="wnbd"
+            "$rbdPoolName test_librbd_fsx0 -N 3000 -d"="librbd";
+            "$rbdPoolName test_librbd_fsx1 -N 3000 -M -L -r 4096 -w 4096 -d"="wnbd"
         };
     }
     # Tests that aren't supposed to be run automatically.
