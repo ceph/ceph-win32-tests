@@ -305,7 +305,7 @@ function run_tests() {
         "ceph_test_timers.exe"="*";
         # For some reason, the following tests gets WSAECONNREFUSED errors but
         # only when running under a powershell job, passing otherwise.
-        "unittest_perf_counters.exe"="*";
+        "unittest_perf_counters*"="*";
         # TODO: the SnaptrimStats test fails on Linux as well, it most probably
         # requires some specific configuration.
         "ceph_test_rados_api_snapshots_stats.exe"="*SnaptrimStats*";
@@ -332,7 +332,6 @@ function run_tests() {
     # The following tests have to be run separately.
     $isolatedTests=@{
         "unittest_admin_socket.exe"="*";
-        "unittest_perf_counters*"="*";
         # Multiple libcephfs tests try to access or remove the same paths.
         # Also, we're skipping flaky delegation tests:
         # https://github.com/ceph/ceph/pull/52427#issuecomment-1640325664
