@@ -282,6 +282,8 @@ function run_tests() {
         "unittest_utime.exe"=@(
             "utime_t.localtime",
             "utime_t.parse_date");
+        # Flaky test, fails on Linux as well
+        "ceph_test_rados_api_io_pp.exe"="LibRadosIoECPP.CrcZeroWrite";
         # The following tests are affected by errno conversions
         "ceph_test_rados_api_snapshots_pp.exe"=`
             # EOLDSNAPC is defined as 85, which overlaps with ERESTART,
