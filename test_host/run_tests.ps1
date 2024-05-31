@@ -337,7 +337,11 @@ function run_tests() {
         # Multiple libcephfs tests try to access or remove the same paths.
         # Also, we're skipping flaky delegation tests:
         # https://github.com/ceph/ceph/pull/52427#issuecomment-1640325664
-        "ceph_test_libcephfs*"="-LibCephFS.Deleg*";
+        #
+        # The snapdiff tests, especially LibCephFS.HugeSnapDiff* take an
+        # excessive amount of time on some Jenkins nodes, possibly due to
+        # reduced resources.
+        "ceph_test_libcephfs*"="-LibCephFS.Deleg*:LibCephFS.HugeSnapDiff*";
     }
 
     # TODO: fix merging hashtables, allow the same suite to have some excluded
