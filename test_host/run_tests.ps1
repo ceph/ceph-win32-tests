@@ -293,6 +293,9 @@ function run_tests() {
         # TODO: ensure that this won't affect the rados/rbd (e.g. we may
         # end up converting values other than error codes, which is wrong).
         "ceph_test_rados_api_tier_pp.exe"="*";
+        # The expected connection timeout is sometimes exceeded, possibly
+        # due to reduced timer or clock precision.
+        "ceph_test_rados_api_misc.exe"="LibRadosMiscConnectFailure.ConnectTimeout";
         # TODO: look into this. seems like a local error (ECANCELED) gets
         # converted to the unix value, yet the test expects the host error.
         "ceph_test_rados_api_aio_pp.exe"="LibRadosAio.OmapPP";
